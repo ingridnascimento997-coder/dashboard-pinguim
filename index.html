@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS Dashboard — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- ═══════════════════════════════════════════════
+       FIREBASE via CDN (sem npm, sem import)
+       Compatível com GitHub Pages
+  ═══════════════════════════════════════════════ -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <style>
+    /* ── VARIÁVEIS TERROSAS ── */
+    :root {
+      --bg:       #f5f0e8;
+      --surface:  #fefcf7;
+      --border:   #d8d0c0;
+      --text:     #2c2417;
+      --text2:    #6b5f4e;
+      --text3:    #9e8e7a;
+      --accent:   #6b4226;
+      --accent2:  #8b5e3c;
+      --accent-l: #f0e0cc;
+      --red:      #7a1e1e;
+      --red-l:    #fde8e8;
+      --red-m:    #c93636;
+      --green:    #2d5a27;
+      --green-l:  #dff0d8;
+      --green-m:  #3d7a35;
+      --shadow:   0 4px 24px rgba(60,40,20,.12), 0 1px 4px rgba(60,40,20,.07);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* Fundo decorativo */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(107,66,38,.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(139,94,60,.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ── CARD DE LOGIN ── */
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Logo / topo */
+    .login-logo {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #6b4226, #8b5e3c);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin: 0 auto 20px;
+      box-shadow: 0 4px 12px rgba(107,66,38,.3);
+    }
+
+    .login-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      text-align: center;
+      letter-spacing: -.4px;
+      margin-bottom: 4px;
+    }
+
+    .login-sub {
+      font-size: 13px;
+      color: var(--text3);
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    /* ── CAMPOS ── */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      background: #faf8f4;
+      outline: none;
+      transition: all .2s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(107,66,38,.10);
+    }
+
+    .field input::placeholder { color: var(--text3); }
+
+    /* ── BOTÃO ── */
+    .btn-login {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: -.2px;
+    }
+
+    .btn-login:hover { opacity: .92; transform: translateY(-1px); }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    /* Spinner no botão */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-login.loading .spinner { display: block; }
+    .btn-login.loading .btn-text { display: none; }
+
+    /* ── MENSAGENS DE ERRO / SUCESSO ── */
+    .msg {
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .msg.error {
+      background: var(--red-l);
+      border: 1px solid #e0a0a0;
+      color: var(--red);
+      display: block;
+    }
+
+    .msg.success {
+      background: var(--green-l);
+      border: 1px solid #a0c8a0;
+      color: var(--green);
+      display: block;
+    }
+
+    /* ── RODAPÉ DO CARD ── */
+    .login-footer {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 11px;
+      color: var(--text3);
+      line-height: 1.6;
+    }
+
+    /* ── RESPONSIVO ── */
+    @media (max-width: 480px) {
+      .login-card { padding: 36px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+
+    <!-- Logo -->
+    <div class="login-logo">🐧</div>
+    <div class="login-title">Agência Pinguim</div>
+    <div class="login-sub">CS Dashboard — Área restrita</div>
+
+    <!-- Mensagem de feedback -->
+    <div class="msg" id="msg-box"></div>
+
+    <!-- Formulário -->
+    <div class="field">
+      <label for="email">E-mail</label>
+      <input
+        type="email"
+        id="email"
+        placeholder="seu@email.com"
+        autocomplete="email"
+        autofocus
+      >
+    </div>
+
+    <div class="field">
+      <label for="senha">Senha</label>
+      <input
+        type="password"
+        id="senha"
+        placeholder="••••••••"
+        autocomplete="current-password"
+      >
+    </div>
+
+    <button class="btn-login" id="btn-login" onclick="fazerLogin()">
+      <div class="spinner"></div>
+      <span class="btn-text">Entrar no dashboard</span>
+    </button>
+
+    <div class="login-footer">
+      Acesso restrito a colaboradores autorizados.<br>
+      Problemas? Fale com o administrador.
+    </div>
+
+  </div><!-- /login-card -->
+
+  <script>
+    // ═══════════════════════════════════════════════════════
+    //  FIREBASE CONFIG
+    //  Insira aqui as configurações do seu projeto Firebase
+    // ═══════════════════════════════════════════════════════
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAu8IAp6ywb2eWmm5zQ81csNsr96KDdXdc",
+      authDomain:        "dashboard-mentorados.firebaseapp.com",
+      projectId:         "dashboard-mentorados",
+      storageBucket:     "dashboard-mentorados.firebasestorage.app",
+      messagingSenderId: "859877209326",
+      appId:             "1:859877209326:web:bad84d576e60d9c8b06fff"
+    };
+
+    // ── Emails autorizados a acessar o dashboard ──
+    const EMAILS_AUTORIZADOS = [
+      "ingrid.agenciapinguim@gmail.com",
+      "fernandalisboa.agenciapinguim@gmail.com"
+    ];
+
+    // ── Inicializa Firebase (compat SDK — funciona via CDN sem npm) ──
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // ── Persiste sessão no navegador (localStorage) ──
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    // ═══════════════════════════════════════════════════════
+    //  VERIFICA SE JÁ ESTÁ LOGADO
+    //  Se sim → redireciona direto para o dashboard
+    // ═══════════════════════════════════════════════════════
+    auth.onAuthStateChanged(function(user) {
+      if (user) {
+        // Valida email mesmo ao restaurar sessão
+        if (EMAILS_AUTORIZADOS.includes(user.email.toLowerCase())) {
+          redirecionarParaDash();
+        } else {
+          // Sessão com email não autorizado — força logout
+          auth.signOut();
+        }
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════
+    //  FUNÇÃO DE LOGIN
+    // ═══════════════════════════════════════════════════════
+    function fazerLogin() {
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const senha = document.getElementById('senha').value;
+      const btn   = document.getElementById('btn-login');
+
+      // Limpa mensagem anterior
+      ocultarMsg();
+
+      // Validações básicas do lado do cliente
+      if (!email) { mostrarErro('Informe seu e-mail.'); return; }
+      if (!senha)  { mostrarErro('Informe sua senha.'); return; }
+
+      // Ativa estado de carregamento
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      // ── Tenta autenticar no Firebase ──
+      auth.signInWithEmailAndPassword(email, senha)
+        .then(function(credencial) {
+          const usuarioEmail = credencial.user.email.toLowerCase();
+
+          // ── Verifica se o email está na lista de autorizados ──
+          if (!EMAILS_AUTORIZADOS.includes(usuarioEmail)) {
+            // Faz logout imediato e bloqueia acesso
+            auth.signOut();
+            mostrarErro('⛔ Acesso não autorizado. Este e-mail não tem permissão de acesso.');
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
+
+          // ── Login autorizado — redireciona ──
+          mostrarSucesso('✅ Login realizado! Redirecionando...');
+          setTimeout(redirecionarParaDash, 800);
+        })
+        .catch(function(erro) {
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          mostrarErro(traduzirErroFirebase(erro.code));
+        });
+    }
+
+    // ── Permite login com Enter ──
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') fazerLogin();
+    });
+
+    // ═══════════════════════════════════════════════════════
+    //  HELPERS
+    // ═══════════════════════════════════════════════════════
+
+    function redirecionarParaDash() {
+      var base = window.location.pathname.replace(/\/[^/]*$/, '/');
+      window.location.href = base + 'dash.html';
+    }
+
+    function mostrarErro(texto) {
+      const box = document.getElementById('msg-box');
+      box.textContent = texto;
+      box.className = 'msg error';
+    }
+
+    function mostrarSucesso(texto) {
+      const box = document.getElementById('msg-box');
+      box.textContent = texto;
+      box.className = 'msg success';
+    }
+
+    function ocultarMsg() {
+      const box = document.getElementById('msg-box');
+      box.textContent = '';
+      box.className = 'msg';
+    }
+
+    // Traduz códigos de erro do Firebase para português
+    function traduzirErroFirebase(codigo) {
+      const erros = {
+        'auth/invalid-email':        'E-mail inválido. Verifique o endereço digitado.',
+        'auth/user-disabled':        'Esta conta está desativada. Fale com o administrador.',
+        'auth/user-not-found':       'E-mail não encontrado. Verifique o endereço.',
+        'auth/wrong-password':       'Senha incorreta. Tente novamente.',
+        'auth/invalid-credential':   'E-mail ou senha incorretos. Tente novamente.',
+        'auth/too-many-requests':    'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+        'auth/network-request-failed': 'Erro de conexão. Verifique sua internet.',
+      };
+      return erros[codigo] || 'Erro ao fazer login. Tente novamente. (' + codigo + ')';
+    }
+  </script>
+
+</body>
+</html>
